@@ -458,6 +458,7 @@ def main():
         
         # Find JSON data file
         json_files = [f for f in os.listdir('data/') if f.endswith('.json')]
+        print("🐍 File: scripts/etl_pipeline.py | Line: 461 | main ~ json_files", json_files)
         if not json_files:
             logging.error("No JSON files found in data/ directory")
             return
