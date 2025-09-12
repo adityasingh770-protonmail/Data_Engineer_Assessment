@@ -447,30 +447,48 @@ class PropertyETL:
         """Clean up resources"""
         if self.db:
             self.db.disconnect()
+    
+def get_data_directory() -> str:
+    """
+    Return absolute path to the data directory which is located one level
+    up from the script (i.e. ../data relative to this script file).
+    """
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    parent_dir = os.path.dirname(script_dir)           # one level up
+    data_dir = os.path.join(parent_dir, 'data')
+    return os.path.normpath(data_dir)
 
 def main():
     """Main execution function"""
-    etl = PropertyETL()
-    
     try:
-        # Setup
+        sys.stdout.reconfigure(encoding='utf-8')
+    except Exception:
+        pass
+
+    etl = PropertyETL()
+    try:
         etl.setup()
-        
-        # Find JSON data file
-        json_files = [f for f in os.listdir('data/') if f.endswith('.json')]
-        print("🐍 File: scripts/etl_pipeline.py | Line: 461 | main ~ json_files", json_files)
-        if not json_files:
-            logging.error("No JSON files found in data/ directory")
+
+        dataDir = get_data_directory()
+        try:
+            jsonFiles = [f for f in os.listdir(dataDir) if f.lower().endswith('.json')]
+        except FileNotFoundError:
+            logging.error("Data directory not found: %s", dataDir)
             return
-        
-        json_path = os.path.join('data', json_files[0])
-        logging.info(f"Processing file: {json_path}")
-        
+
+        logging.info("Found JSON files: %s", jsonFiles)
+        if not jsonFiles:
+            logging.error("No JSON files found in data/ directory (%s)", dataDir)
+            return
+
+        jsonPath = os.path.join(dataDir, jsonFiles[0])
+        logging.info("Processing file: %s", jsonPath)
+
         # Run pipeline
-        etl.run_pipeline(json_path)
-        
+        etl.run_pipeline(jsonPath)
+
     except Exception as e:
-        logging.error(f"Pipeline failed: {e}")
+        logging.error("Pipeline failed: %s", e, exc_info=True)
     finally:
         etl.cleanup()
 
