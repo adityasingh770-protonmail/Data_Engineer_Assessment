@@ -10,7 +10,7 @@ services:
       MYSQL_USER: db_user
       MYSQL_PASSWORD: 6equj5_db_user
     volumes:
-      - mysql_vol:/var/lib/mysql:rw
+      - "C:/Users/vivek/Downloads/sql_data_file/mysql:/var/lib/mysql"
     ports:
       - 3306:3306
     networks:
@@ -19,5 +19,5 @@ services:
 networks:
   app_net:
 
-volumes:
-  mysql_vol:
+# volumes:
+#   mysql_vol:

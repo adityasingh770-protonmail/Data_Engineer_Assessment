@@ -1,5 +1,7 @@
 -- Create normalized schema for property data
 -- This script creates the relational structure for property records
+-- Drop views first (before dropping tables they depend on)
+DROP VIEW IF EXISTS property_summary;
 
 -- Drop tables in reverse order of dependencies (if they exist)
 DROP TABLE IF EXISTS property_valuations;
