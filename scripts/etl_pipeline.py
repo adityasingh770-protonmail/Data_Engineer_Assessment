@@ -152,24 +152,28 @@ class PropertyDataTransformer:
     
     def __init__(self, field_config: FieldConfigLoader):
         self.field_config = field_config
-        
+            
     def clean_and_validate_data(self, raw_data: Dict) -> Dict:
-        """Clean and validate individual property record"""
+        """Clean and validate individual property record""" 
         cleaned = {}
-        
+    
         for field, value in raw_data.items():
+            logging.info(f"DEBUG field: {field} {value}") 
             if field in self.field_config.field_mapping:
+                logging.info(f"DEBUG field_mapping found for: {field}")
                 config = self.field_config.field_mapping[field]
+                logging.info(f"DEBUG config: {config}")
                 cleaned_value = self._clean_value(value, config['type'])
-                
+                logging.info(f"DEBUG cleaned_value: {cleaned_value}")
                 if cleaned_value is not None:
                     table = config['table']
                     column = config['column']
-                    
+                
                     if table not in cleaned:
+                        logging.info(f"DEBUG creating new table: {table}")
                         cleaned[table] = {}
                     cleaned[table][column] = cleaned_value
-        
+    
         return cleaned
     
     def _clean_value(self, value: Any, data_type: str) -> Any:
@@ -292,6 +296,7 @@ class PropertyETL:
         try:
             # Clean and transform data
             cleaned_data = self.transformer.clean_and_validate_data(raw_property)
+            logging.info(f"DEBUG {cleaned_data}")
             
             if 'properties' not in cleaned_data:
                 logging.warning("No property data found in record")
@@ -433,7 +438,7 @@ class PropertyETL:
         
         for i, property_record in enumerate(raw_data):
             logging.info(f"Processing record {i+1}/{len(raw_data)}")
-            logging.info(f"Processing record Val {raw_data}")
+            logging.info(f"Processing record Val {i}, {property_record}")
             
             property_id = self.process_property(property_record)
             if property_id:
