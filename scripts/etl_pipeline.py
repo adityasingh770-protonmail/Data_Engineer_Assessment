@@ -433,6 +433,7 @@ class PropertyETL:
         
         for i, property_record in enumerate(raw_data):
             logging.info(f"Processing record {i+1}/{len(raw_data)}")
+            logging.info(f"Processing record Val {raw_data}")
             
             property_id = self.process_property(property_record)
             if property_id:
