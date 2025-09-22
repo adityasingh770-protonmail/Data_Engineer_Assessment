@@ -4,7 +4,7 @@
 
 This project implements a complete ETL pipeline to normalize property data from JSON format into a relational MySQL database. The solution transforms denormalized property records containing mixed attributes (property details, HOA data, rehab estimates, valuations) into a properly normalized relational schema.
 
-## Project Structur
+## Project Structure
 
 ```
 ├── data/
