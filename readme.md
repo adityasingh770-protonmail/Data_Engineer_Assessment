@@ -8,7 +8,7 @@ This project implements a complete ETL pipeline to normalize property data from 
 
 ```
 ├── data/
-│   ├── [property_data].json          # Raw JSON property data
+│   ├── [property_data].json          # Raw JSON property dat
 │   └── Field Config.xlsx             # Business logic mapping
 ├── sql/
 │   ├── 01_create_schema.sql          # Database schema creation
