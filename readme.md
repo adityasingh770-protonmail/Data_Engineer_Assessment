@@ -1,4 +1,4 @@
-# Data Engineering Assessment - Property Data ETL Pipelin
+# Data Engineering Assessment - Property Data ETL Pipeline
 
 ## Overview
 
