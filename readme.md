@@ -124,7 +124,7 @@ This generates:
 
 ### Normalization Process
 1. **Extract** property attributes from JSON
-2. **Transform** according to business rules in field config
+2. **Transform** according to business rules in the field config
 3. **Load** into appropriate normalized tables
 4. **Link** related records via foreign keys
 
