@@ -261,7 +261,7 @@ Expected outputs:
 
 2. **ETL Pipeline Errors**
    - Check JSON file format and location
-   - Verify field configuration file exists
+   - Verify the field configuration file exists
    - Review logs for specific error messages
 
 3. **Data Quality Issues**
