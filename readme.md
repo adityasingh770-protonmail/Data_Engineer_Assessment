@@ -189,7 +189,7 @@ WHERE pre.priority_level = 'HIGH';
 
 ### Run Analysis
 ```sql
--- Market analysis for specific city
+-- Market analysis for a specific city
 CALL GetMarketAnalysis('Austin', 'TX');
 
 -- Get complete property details  
