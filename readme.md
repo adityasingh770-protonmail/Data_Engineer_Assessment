@@ -129,7 +129,7 @@ This generates:
 4. **Link** related records via foreign keys
 
 ### Field Configuration Support
-The pipeline uses `data/Field Config.xlsx` to map raw JSON fields to target database schema:
+The pipeline uses `data/Field Config.xlsx` to map raw JSON fields to the target database schema:
 - Raw field names to target table/column mapping
 - Data type specifications
 - Business logic rules
