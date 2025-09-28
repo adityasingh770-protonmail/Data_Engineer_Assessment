@@ -93,7 +93,7 @@ python scripts/etl_pipeline.py
 ```
 
 The ETL pipeline will:
-- Load the field configuration from Excel file
+- Load the field configuration from the Excel file
 - Read and parse the JSON property data
 - Clean and validate the data
 - Transform data into normalized format
