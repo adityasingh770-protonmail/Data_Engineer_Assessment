@@ -257,7 +257,7 @@ Expected outputs:
 1. **Database Connection Failed**
    - Verify MySQL container is running: `docker ps`
    - Check connection parameters in scripts
-   - Ensure database and user exist
+   - Ensure the database and user exist
 
 2. **ETL Pipeline Errors**
    - Check JSON file format and location
