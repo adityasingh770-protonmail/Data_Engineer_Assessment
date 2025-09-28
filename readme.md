@@ -96,7 +96,7 @@ The ETL pipeline will:
 - Load the field configuration from the Excel file
 - Read and parse the JSON property data
 - Clean and validate the data
-- Transform data into normalized format
+- Transform data into a normalized format
 - Load data into the relational database
 - Handle foreign key relationships
 - Log all operations and errors
