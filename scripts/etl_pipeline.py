@@ -154,26 +154,21 @@ class PropertyDataTransformer:
         self.field_config = field_config
             
     def clean_and_validate_data(self, raw_data: Dict) -> Dict:
-        """Clean and validate individual property record""" 
+        """Clean and validate individual property record"""
         cleaned = {}
-    
+
         for field, value in raw_data.items():
-            logging.info(f"DEBUG field: {field} {value}") 
             if field in self.field_config.field_mapping:
-                logging.info(f"DEBUG field_mapping found for: {field}")
                 config = self.field_config.field_mapping[field]
-                logging.info(f"DEBUG config: {config}")
                 cleaned_value = self._clean_value(value, config['type'])
-                logging.info(f"DEBUG cleaned_value: {cleaned_value}")
                 if cleaned_value is not None:
                     table = config['table']
                     column = config['column']
-                
+
                     if table not in cleaned:
-                        logging.info(f"DEBUG creating new table: {table}")
                         cleaned[table] = {}
                     cleaned[table][column] = cleaned_value
-    
+
         return cleaned
     
     def _clean_value(self, value: Any, data_type: str) -> Any:
@@ -190,7 +185,16 @@ class PropertyDataTransformer:
                 year = int(float(str(value)))
                 return year if 1800 <= year <= 2100 else None
             elif data_type == 'BOOLEAN':
-                return bool(value) if isinstance(value, bool) else str(value).lower() in ['true', '1', 'yes']
+                # MySQL BOOLEAN expects 0 or 1
+                if isinstance(value, bool):
+                    return 1 if value else 0
+                return 1 if str(value).lower() in ['true', '1', 'yes'] else 0
+            elif data_type == 'VARCHAR_TO_BOOLEAN':
+                # Convert Yes/No/None strings to 1/0 for MySQL BOOLEAN
+                if value is None or str(value).strip() in ['None', '', 'null']:
+                    return None
+                str_val = str(value).lower().strip()
+                return 1 if str_val in ['yes', 'true', '1'] else 0
             elif data_type == 'VARCHAR':
                 return str(value).strip()[:255]  # Truncate to fit VARCHAR(255)
             else:
@@ -201,17 +205,47 @@ class PropertyDataTransformer:
             return None
     
     def extract_valuations(self, raw_data: Dict) -> List[Dict]:
-        """Extract valuation data from raw record"""
+        """Extract valuation data from raw record - handles both flat and nested formats"""
         valuations = []
-        
-        # Look for various valuation fields
+
+        # Handle nested array format (fake_property_data.json: "Valuation": [{...}, {...}])
+        if 'Valuation' in raw_data and isinstance(raw_data['Valuation'], list):
+            for val_record in raw_data['Valuation']:
+                # Map each field in the valuation object to a valuation type
+                valuation_type_mapping = {
+                    'List_Price': 'List Price',
+                    'Zestimate': 'Zestimate',
+                    'ARV': 'ARV',
+                    'Expected_Rent': 'Expected Rent',
+                    'Rent_Zestimate': 'Rent Zestimate',
+                    'Low_FMR': 'Low FMR',
+                    'High_FMR': 'High FMR',
+                    'Redfin_Value': 'Redfin Value',
+                    'Previous_Rent': 'Previous Rent'
+                }
+
+                for field_name, valuation_type in valuation_type_mapping.items():
+                    if field_name in val_record and val_record[field_name]:
+                        try:
+                            amount = float(val_record[field_name])
+                            if amount > 0:
+                                valuations.append({
+                                    'type': valuation_type,
+                                    'amount': amount,
+                                    'date': datetime.now().date(),
+                                    'source': 'ETL Import - Nested'
+                                })
+                        except (ValueError, TypeError):
+                            continue
+
+        # Handle flat format (sample_properties.json: "market_value": 123, "tax_assessment": 456)
         valuation_fields = {
             'market_value': 'Market Value',
             'tax_assessment': 'Tax Assessment',
             'insurance_value': 'Insurance Value',
             'rental_estimate': 'Rental Value'
         }
-        
+
         for field, valuation_type in valuation_fields.items():
             if field in raw_data and raw_data[field]:
                 try:
@@ -221,26 +255,84 @@ class PropertyDataTransformer:
                             'type': valuation_type,
                             'amount': amount,
                             'date': datetime.now().date(),
-                            'source': 'ETL Import'
+                            'source': 'ETL Import - Flat'
                         })
                 except (ValueError, TypeError):
                     continue
-        
+
         return valuations
     
     def extract_rehab_estimates(self, raw_data: Dict) -> List[Dict]:
-        """Extract rehab estimate data from raw record"""
+        """Extract rehab estimate data from raw record - handles both flat costs and nested flag format"""
         estimates = []
-        
-        # Look for rehab-related fields
+
+        # Handle nested array format (fake_property_data.json: "Rehab": [{...}, {...}])
+        if 'Rehab' in raw_data and isinstance(raw_data['Rehab'], list):
+            for rehab_record in raw_data['Rehab']:
+                # Extract Underwriting_Rehab and Rehab_Calculation as total costs
+                if 'Underwriting_Rehab' in rehab_record and rehab_record['Underwriting_Rehab']:
+                    try:
+                        cost = float(rehab_record['Underwriting_Rehab'])
+                        if cost > 0:
+                            estimates.append({
+                                'category': 'Structural',
+                                'cost': cost,
+                                'priority': 'HIGH',
+                                'date': datetime.now().date()
+                            })
+                    except (ValueError, TypeError):
+                        pass
+
+                # Extract flag-based rehab items
+                flag_mapping = {
+                    'Paint': 'Interior',
+                    'Flooring_Flag': 'Flooring',
+                    'Foundation_Flag': 'Structural',
+                    'Roof_Flag': 'Roofing',
+                    'HVAC_Flag': 'HVAC',
+                    'Kitchen_Flag': 'Kitchen',
+                    'Bathroom_Flag': 'Bathroom',
+                    'Appliances_Flag': 'Kitchen',
+                    'Windows_Flag': 'Exterior',
+                    'Landscaping_Flag': 'Exterior'
+                }
+
+                for flag_field, category in flag_mapping.items():
+                    if flag_field in rehab_record:
+                        flag_value = rehab_record[flag_field]
+                        # Only add if flag is 'Yes' or True
+                        if flag_value in ['Yes', 'yes', True, 1, '1']:
+                            # Estimate cost based on category (placeholder values)
+                            estimated_costs = {
+                                'Interior': 3000,
+                                'Flooring': 5000,
+                                'Structural': 15000,
+                                'Roofing': 12000,
+                                'HVAC': 6000,
+                                'Kitchen': 15000,
+                                'Bathroom': 8000,
+                                'Exterior': 7000
+                            }
+                            estimates.append({
+                                'category': category,
+                                'cost': estimated_costs.get(category, 5000),
+                                'priority': 'MEDIUM',
+                                'date': datetime.now().date()
+                            })
+
+        # Handle flat format (sample_properties.json: "kitchen_rehab": 15000, "bathroom_rehab": 8000)
         rehab_fields = {
             'kitchen_rehab': 'Kitchen',
             'bathroom_rehab': 'Bathroom',
             'flooring_cost': 'Flooring',
             'roof_repair': 'Roofing',
-            'hvac_cost': 'HVAC'
+            'hvac_cost': 'HVAC',
+            'electrical_work': 'Electrical',
+            'plumbing_work': 'Plumbing',
+            'interior_paint': 'Interior',
+            'exterior_paint': 'Exterior'
         }
-        
+
         for field, category in rehab_fields.items():
             if field in raw_data and raw_data[field]:
                 try:
@@ -254,8 +346,51 @@ class PropertyDataTransformer:
                         })
                 except (ValueError, TypeError):
                     continue
-        
+
         return estimates
+
+    def extract_hoa_data(self, raw_data: Dict) -> List[Dict]:
+        """Extract HOA data from raw record - handles both flat and nested formats"""
+        hoa_data_list = []
+
+        # Handle nested array format (fake_property_data.json: "HOA": [{...}, {...}])
+        if 'HOA' in raw_data and isinstance(raw_data['HOA'], list):
+            for hoa_record in raw_data['HOA']:
+                monthly_fee = None
+                hoa_flag = hoa_record.get('HOA_Flag', 'No')
+
+                # Extract HOA fee
+                if 'HOA' in hoa_record and hoa_record['HOA']:
+                    try:
+                        monthly_fee = float(hoa_record['HOA'])
+                    except (ValueError, TypeError):
+                        continue
+
+                # Only add if there's a fee or if HOA_Flag is Yes
+                if monthly_fee and monthly_fee > 0:
+                    hoa_data_list.append({
+                        'monthly_fee': monthly_fee,
+                        'hoa_flag': hoa_flag,
+                        'date': datetime.now().date()
+                    })
+
+        # Handle flat format (sample_properties.json: "hoa_monthly_fee": 150)
+        if 'hoa_monthly_fee' in raw_data and raw_data['hoa_monthly_fee']:
+            try:
+                fee = float(raw_data['hoa_monthly_fee'])
+                if fee > 0:
+                    hoa_data_list.append({
+                        'monthly_fee': fee,
+                        'hoa_name': raw_data.get('hoa_name'),
+                        'special_assessment': raw_data.get('hoa_special_assessment'),
+                        'amenities': raw_data.get('hoa_amenities'),
+                        'management_company': raw_data.get('hoa_management'),
+                        'date': datetime.now().date()
+                    })
+            except (ValueError, TypeError):
+                pass
+
+        return hoa_data_list
 
 class PropertyETL:
     """Main ETL pipeline orchestrator"""
@@ -296,8 +431,7 @@ class PropertyETL:
         try:
             # Clean and transform data
             cleaned_data = self.transformer.clean_and_validate_data(raw_property)
-            logging.info(f"DEBUG {cleaned_data}")
-            
+
             if 'properties' not in cleaned_data:
                 logging.warning("No property data found in record")
                 return None
@@ -320,7 +454,12 @@ class PropertyETL:
             estimates = self.transformer.extract_rehab_estimates(raw_property)
             for estimate in estimates:
                 self._insert_rehab_estimate(property_id, estimate)
-            
+
+            # Insert HOA data
+            hoa_data_list = self.transformer.extract_hoa_data(raw_property)
+            for hoa_data in hoa_data_list:
+                self._insert_hoa_data(property_id, hoa_data)
+
             self.db.commit()
             return property_id
             
@@ -421,33 +560,99 @@ class PropertyETL:
             self.db.cursor.execute(query, values)
         except Error as e:
             logging.error(f"Error inserting rehab estimate: {e}")
-    
+
+    def _insert_hoa_data(self, property_id: int, hoa_data: Dict):
+        """Insert HOA data for property"""
+        hoa_id = None
+
+        # Check if we need to create/lookup HOA association
+        if 'hoa_name' in hoa_data and hoa_data['hoa_name']:
+            # Try to find existing HOA
+            hoa_query = "SELECT hoa_id FROM hoa_associations WHERE hoa_name = %s"
+            result = self.db.execute_query(hoa_query, (hoa_data['hoa_name'],))
+
+            if result:
+                hoa_id = result[0]['hoa_id']
+            else:
+                # Create new HOA association
+                insert_hoa_query = """
+                INSERT INTO hoa_associations (hoa_name, management_company)
+                VALUES (%s, %s)
+                """
+                try:
+                    self.db.cursor.execute(insert_hoa_query, (
+                        hoa_data['hoa_name'],
+                        hoa_data.get('management_company')
+                    ))
+                    hoa_id = self.db.cursor.lastrowid
+                except Error as e:
+                    logging.error(f"Error inserting HOA association: {e}")
+
+        # Insert property HOA data
+        query = """
+        INSERT INTO property_hoa_data
+        (property_id, hoa_id, monthly_fee, special_assessment, amenities, effective_date)
+        VALUES (%s, %s, %s, %s, %s, %s)
+        """
+
+        values = (
+            property_id,
+            hoa_id,
+            hoa_data.get('monthly_fee'),
+            hoa_data.get('special_assessment'),
+            hoa_data.get('amenities'),
+            hoa_data.get('date')
+        )
+
+        try:
+            self.db.cursor.execute(query, values)
+        except Error as e:
+            logging.error(f"Error inserting HOA data: {e}")
+
     def run_pipeline(self, json_path: str):
         """Execute the complete ETL pipeline"""
         logging.info("Starting ETL pipeline")
-        
+
         # Load data
         raw_data = self.load_json_data(json_path)
         if not raw_data:
             logging.error("No data to process")
             return
-        
+
         # Process each property
         processed_count = 0
         failed_count = 0
-        
+        total_records = len(raw_data)
+
+        # Log progress every N records for large datasets
+        progress_interval = 100 if total_records > 1000 else 10
+
         for i, property_record in enumerate(raw_data):
-            logging.info(f"Processing record {i+1}/{len(raw_data)}")
-            logging.info(f"Processing record Val {i}, {property_record}")
-            
+            # Only log details every N records for large datasets
+            if i % progress_interval == 0 or i == total_records - 1:
+                logging.info(f"Progress: {i+1}/{total_records} ({(i+1)/total_records*100:.1f}%)")
+
+            # Disable verbose logging for large datasets
+            if total_records <= 100:
+                logging.info(f"Processing record {i+1}/{total_records}")
+                logging.info(f"Processing record Val {i}, {property_record}")
+
             property_id = self.process_property(property_record)
             if property_id:
                 processed_count += 1
-                logging.info(f"Successfully processed property ID: {property_id}")
+                if total_records <= 100:
+                    logging.info(f"Successfully processed property ID: {property_id}")
             else:
                 failed_count += 1
-        
-        logging.info(f"ETL pipeline complete. Processed: {processed_count}, Failed: {failed_count}")
+                logging.warning(f"Failed to process record {i+1}")
+
+        logging.info("=" * 80)
+        logging.info(f"ETL pipeline complete for {json_path}")
+        logging.info(f"Total Records: {total_records}")
+        logging.info(f"Successfully Processed: {processed_count}")
+        logging.info(f"Failed: {failed_count}")
+        logging.info(f"Success Rate: {processed_count/total_records*100:.1f}%")
+        logging.info("=" * 80)
     
     def cleanup(self):
         """Clean up resources"""
@@ -487,11 +692,15 @@ def main():
             logging.error("No JSON files found in data/ directory (%s)", dataDir)
             return
 
-        jsonPath = os.path.join(dataDir, jsonFiles[0])
-        logging.info("Processing file: %s", jsonPath)
+        # Process ALL JSON files in the data directory
+        for jsonFile in jsonFiles:
+            jsonPath = os.path.join(dataDir, jsonFile)
+            logging.info("=" * 80)
+            logging.info("Processing file: %s", jsonPath)
+            logging.info("=" * 80)
 
-        # Run pipeline
-        etl.run_pipeline(jsonPath)
+            # Run pipeline for this file
+            etl.run_pipeline(jsonPath)
 
     except Exception as e:
         logging.error("Pipeline failed: %s", e, exc_info=True)

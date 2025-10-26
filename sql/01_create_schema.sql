@@ -90,7 +90,16 @@ INSERT INTO valuation_types (type_name, description) VALUES
 ('Tax Assessment', 'Official tax assessment value'),
 ('Insurance Value', 'Replacement cost for insurance'),
 ('Rental Value', 'Estimated monthly rental income'),
-('Quick Sale', 'Value for quick sale scenario');
+('Quick Sale', 'Value for quick sale scenario'),
+('List Price', 'Listed price from MLS or listing service'),
+('Zestimate', 'Zillow estimated value'),
+('ARV', 'After Repair Value - estimated value after renovations'),
+('Expected Rent', 'Expected monthly rental income'),
+('Rent Zestimate', 'Zillow estimated rental income'),
+('Low FMR', 'Fair Market Rent - Low estimate'),
+('High FMR', 'Fair Market Rent - High estimate'),
+('Redfin Value', 'Redfin estimated value'),
+('Previous Rent', 'Previously achieved rental income');
 
 -- 6. Property Valuations (Multiple valuations per property)
 CREATE TABLE property_valuations (
